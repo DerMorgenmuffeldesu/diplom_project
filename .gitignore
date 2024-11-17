@@ -1,0 +1,26 @@
+# Виртуальная среда
+venv/
+env/
+.venv/
+
+# Секретные файлы
+.env
+
+# БД
+db.sqlite3
+
+# Папки и файлы кэша
+*.log
+*.pot
+*.pyc
+*.pyo
+__pycache__/
+
+# Конфигурации IDE
+.idea/
+.vscode/
+
+# Результаты тестирования
+.tox/
+.nox/
+.coverage
