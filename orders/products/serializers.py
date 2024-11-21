@@ -9,11 +9,26 @@ class SupplierSerializer(serializers.ModelSerializer):
 class ProductAttributeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductAttribute
-        fields = '__all__'
+        fields = ['attribute_name', 'value']
 
 class ProductSerializer(serializers.ModelSerializer):
-    attributes = ProductAttributeSerializer(many=True, read_only=True)
+    supplier = serializers.PrimaryKeyRelatedField(queryset=Supplier.objects.all())
 
     class Meta:
         model = Product
         fields = '__all__'
+
+    def create(self, validated_data):
+        supplier = validated_data.get('supplier')  # Получаем поставщика из данных
+        if not supplier:
+            raise serializers.ValidationError("Supplier is required.")
+        return super().create(validated_data)
+    
+
+
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get('name', instance.name)
+        instance.description = validated_data.get('description', instance.description)
+        instance.price = validated_data.get('price', instance.price)
+        instance.stock = validated_data.get('stock', instance.stock)
+        instance.save()

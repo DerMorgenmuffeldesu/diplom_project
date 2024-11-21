@@ -24,3 +24,5 @@ __pycache__/
 .tox/
 .nox/
 .coverage
+
+api_tests/
