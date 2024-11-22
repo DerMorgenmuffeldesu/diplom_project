@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta
+from django.core.mail import send_mail
+from django.conf import settings
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -39,9 +42,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
+    'rest_framework_simplejwt',
     'products',
     'order',
     'users',
+    'django_extensions',
 ]
 
 MIDDLEWARE = [
@@ -85,20 +90,42 @@ DATABASES = {
     }
 }
 
+FRONTEND_URL = 'http://127.0.0.1:8000'
 
 REST_FRAMEWORK = {
-     'DEFAULT_AUTHENTICATION_CLASSES': (
+    'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ),
 }
 
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.example.com'
-EMAIL_PORT = 587
+EMAIL_HOST = 'smtp.elasticemail.com'
+EMAIL_PORT = 2525
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'your_email@example.com'
-EMAIL_HOST_PASSWORD = 'your_password'
+EMAIL_HOST_USER = '.............'
+EMAIL_HOST_PASSWORD = '..............'
+DEFAULT_FROM_EMAIL = '............'
+
+
+send_mail(
+    'Тема письма',  # Тема письма
+    'Текст письма',  # Текст письма
+    settings.DEFAULT_FROM_EMAIL,  # От кого (обычно задается в settings.py)
+    ['.......'],  # Кому (список email получателей)
+    fail_silently=False,  # Если True, ошибки не будут вызваны исключениями
+)
+
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(minutes=60),
+}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
