@@ -107,16 +107,16 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.elasticemail.com'
 EMAIL_PORT = 2525
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = '.............'
-EMAIL_HOST_PASSWORD = '..............'
-DEFAULT_FROM_EMAIL = '............'
+EMAIL_HOST_USER = ''
+EMAIL_HOST_PASSWORD = ''
+DEFAULT_FROM_EMAIL = ''
 
 
 send_mail(
-    'Тема письма',  # Тема письма
+    'Добро пожаловать',  # Тема письма
     'Текст письма',  # Текст письма
     settings.DEFAULT_FROM_EMAIL,  # От кого (обычно задается в settings.py)
-    ['.......'],  # Кому (список email получателей)
+    [''],  # Кому (список email получателей)
     fail_silently=False,  # Если True, ошибки не будут вызваны исключениями
 )
 
