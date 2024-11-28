@@ -51,3 +51,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         )
 
         return Response(ProductSerializer(product).data, status=status.HTTP_201_CREATED)
+    
+
+    
+    

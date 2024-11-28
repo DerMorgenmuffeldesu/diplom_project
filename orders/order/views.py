@@ -5,6 +5,10 @@ from .serializers import OrderSerializer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from products.models import Product, Supplier
+from django.shortcuts import get_object_or_404
+from rest_framework.decorators import action
+from rest_framework.parsers import JSONParser
+from django.contrib.auth.models import User
 
 
 
@@ -46,4 +50,41 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(order)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+
+    @action(detail=False, methods=['get'], parser_classes=[JSONParser])
+    def import_user_orders(self, request, *args, **kwargs):
+        """
+        Возвращает список товаров, которые заказал указанный пользователь.
+        """
+        # Извлекаем имя пользователя из запроса
+        username = request.data.get("username")
+        if not username:
+            return Response({"error": "Отсутствует имя пользователя."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Проверяем существование пользователя
+        user = get_object_or_404(User, username=username)
+
+        # Получаем все заказы пользователя
+        orders = Order.objects.filter(customer=user)
+
+        # Если заказы отсутствуют
+        if not orders.exists():
+            return Response({"message": f"У пользователя '{username}' нет заказов."}, status=status.HTTP_200_OK)
+
+        # Сбор информации о товарах
+        products = []
+        for order in orders:
+            order_products = OrderProduct.objects.filter(order=order).select_related('product', 'supplier')
+            for op in order_products:
+                products.append({
+                    "order": order.id,
+                    "pname": op.product.name,
+                    "name": op.supplier.name,
+                    "quantity": op.quantity,
+                    "status": order.status,
+                    "created_at": order.created_at,
+                })
+
+        return Response({"products": products}, status=status.HTTP_200_OK)
 
