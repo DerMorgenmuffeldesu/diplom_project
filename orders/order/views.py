@@ -1,3 +1,4 @@
+from ast import parse
 from django.shortcuts import render
 from rest_framework import viewsets, status
 from .models import Order, OrderProduct
@@ -94,3 +95,20 @@ class OrderViewSet(viewsets.ModelViewSet):
     
 
 
+    @action(detail=False, methods=['get'], url_path='import-products', url_name='import_products')
+    def import_products(self, request, *args, **kwargs):
+        user = request.user  # Получаем текущего пользователя из запроса
+        orders = Order.objects.filter(customer=user)  # Фильтруем заказы по пользователю
+
+        products = []
+        for order in orders:
+            for item in order.orderproduct_set.all():
+                products.append({
+                    "product_id": item.product.id,
+                    "name": item.product.name,
+                    "quantity": item.quantity,
+                    "supplier": item.supplier.supplier_name,
+                    "specifications": item.specification,
+                })
+
+        return Response({"products": products}, status=status.HTTP_200_OK)

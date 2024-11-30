@@ -9,4 +9,5 @@ router.register(r'shipping-addresses', ShippingAddressViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),  # подключение маршрутов из роутера
+
 ]
