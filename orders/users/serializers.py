@@ -1,9 +1,8 @@
 from typing import Required
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from rest_framework_simplejwt.tokens import RefreshToken
-from .models import Profile
 from django.contrib.auth import authenticate
+from .models import ShippingAddress
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -30,3 +29,9 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid credentials")
         data['user'] = user
         return data
+    
+
+class ShippingAddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShippingAddress
+        fields = ['id', 'address_line1', 'address_line2', 'city', 'postal_code', 'country', 'phone', 'is_primary']

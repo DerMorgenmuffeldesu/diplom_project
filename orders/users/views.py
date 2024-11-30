@@ -1,9 +1,8 @@
-import email
 from django.shortcuts import render
 from rest_framework import status, permissions, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .serializers import RegisterSerializer, LoginSerializer
+from .serializers import RegisterSerializer, LoginSerializer, ShippingAddressSerializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -14,8 +13,9 @@ from django.contrib.auth.password_validation import validate_password
 from django.utils.encoding import force_bytes, force_str
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from rest_framework.authentication import BasicAuthentication, SessionAuthentication
 from django.core.exceptions import ValidationError
+from .models import ShippingAddress
+from rest_framework import viewsets
 
 
 
@@ -59,89 +59,53 @@ class ProtectedView(APIView):
     
 
 
-class PasswordResetRequestView(APIView):
-    permission_classes = [AllowAny]  # Доступно всем
+class PasswordResetView(APIView):
+    permission_classes = [IsAuthenticated]  # Доступно только аутентифицированным пользователям
 
     def post(self, request):
-        username = request.data.get('username')
-
-        if not username:
-            return Response({'detail': 'Username is required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
-            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        # Генерация токена для сброса пароля
-        token = default_token_generator.make_token(user)
-        reset_url = f'{settings.FRONTEND_URL}/api/users/password-reset/confirm/?token={token}&username={user.username}'
-
-        # Отправка email с ссылкой
-        send_mail(
-            'Password Reset',
-            f'Click the following link to reset your password: {reset_url}',
-            '........',  # Замените на ваш email
-            [user.email],
-            fail_silently=False,
-        )
-
-        return Response({'detail': 'Password reset link sent to email.'}, status=status.HTTP_200_OK)
-    
-
-
-class PasswordResetConfirmView(APIView):
-    permission_classes = [AllowAny]  # Доступно всем
-
-    def post(self, request):
-        token = request.data.get('token')
+        old_password = request.data.get('old_password')
         new_password = request.data.get('new_password')
-        uidb64 = request.data.get('uid')
 
-        # Проверяем наличие обязательных параметров
-        if not token or not new_password or not uidb64:
-            return Response(
-                {'detail': 'Token, new password, and UID are required.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Проверяем, что оба пароля предоставлены
+        if not old_password or not new_password:
+            return Response({'detail': 'Both old and new passwords are required.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
+        user = request.user
+
+        # Проверяем правильность старого пароля
+        if not user.check_password(old_password):
+            return Response({'detail': 'Old password is incorrect.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Проверка нового пароля (стандартные проверки Django)
         try:
-            # Декодируем UID и ищем пользователя
-            user_id = urlsafe_base64_decode(uidb64).decode('utf-8')
-            user = User.objects.get(id=user_id)
+            validate_password(new_password, user)
+        except ValidationError as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Проверяем токен
-            if not default_token_generator.check_token(user, token):
-                return Response(
-                    {'detail': 'Invalid or expired token.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        # Устанавливаем новый пароль
+        user.set_password(new_password)
+        user.save()
 
-            # Проверяем новый пароль
-            try:
-                validate_password(new_password, user)
-            except ValidationError as e:
-                return Response(
-                    {'detail': str(e)},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+        return Response({'detail': 'Password has been successfully updated.'}, status=status.HTTP_200_OK)
 
-            # Устанавливаем новый пароль
-            user.set_password(new_password)
-            user.save()
 
-            return Response(
-                {'detail': 'Password has been reset successfully.'},
-                status=status.HTTP_200_OK
-            )
 
-        except User.DoesNotExist:
-            return Response(
-                {'detail': 'User not found.'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        except Exception as e:
-            return Response(
-                {'detail': str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+class ShippingAddressViewSet(viewsets.ModelViewSet):
+    queryset = ShippingAddress.objects.all()
+    serializer_class = ShippingAddressSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        # Убедимся, что у пользователя не может быть более одного основного адреса
+        if serializer.validated_data.get('is_primary', False):
+            ShippingAddress.objects.filter(user=self.request.user, is_primary=True).update(is_primary=False)
+        
+        serializer.save(user=self.request.user)
+
+    def perform_destroy(self, instance):
+        # Не удалять основной адрес доставки, если их больше нет
+        if instance.is_primary and ShippingAddress.objects.filter(user=instance.user).count() == 1:
+            return Response({"error": "Cannot delete the only primary shipping address."}, status=400)
+        instance.delete()

@@ -4,11 +4,23 @@ from .models import Order, OrderProduct
 from .serializers import OrderSerializer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from products.models import Product, Supplier
+from products.models import Product, Supplier, Specification
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
 from rest_framework.parsers import JSONParser
 from django.contrib.auth.models import User
+from users.serializers import ShippingAddressSerializer
+from users.models import ShippingAddress
+
+
+
+class ShippingAddressViewSet(viewsets.ModelViewSet):
+    queryset = ShippingAddress.objects.all()
+    serializer_class = ShippingAddressSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 
@@ -18,73 +30,67 @@ class OrderViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
-        # Получаем текущего пользователя
         user = request.user
+        orders_data = request.data if isinstance(request.data, list) else [request.data]
+        created_orders = []
 
-        # Проверяем, есть ли данные для создания заказа
-        items_data = request.data.get('items', [])
-        if not items_data:
-            return Response({"error": "Order must have at least one item."}, status=status.HTTP_400_BAD_REQUEST)
+        for order_data in orders_data:
+            items_data = order_data.get('items', [])
+            if not items_data:
+                return Response({"error": "Each order must have at least one item."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Создаем заказ
-        order = Order.objects.create(customer=user)
+            customer_id = order_data.get('customer')
+            try:
+                customer = User.objects.get(id=customer_id)
+            except User.DoesNotExist:
+                return Response({"error": f"User with ID {customer_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
+
+
+            # Получаем  адрес доставки, если он есть
+            shipping_address_data = order_data.get('shipping_address', None)
+            shipping_address = None
+
+
+            # Проверяем, если есть shipping_address в запросе
+            if shipping_address_data:
+                shipping_address_serializer = ShippingAddressSerializer(data=shipping_address_data)
+                if shipping_address_serializer.is_valid():
+                    shipping_address = shipping_address_serializer.save(user=customer)
+                else:
+                    return Response(shipping_address_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+
+            # Создаем заказ
+            order = Order.objects.create(customer=customer, shipping_address=shipping_address)
 
         # Добавляем товары в заказ
-        for item in items_data:
-            product_id = item.get('product_id')
-            supplier_id = item.get('supplier_id')
-            quantity = item.get('quantity', 1)
+            for item in items_data:
+                name = item.get('name')
+                supplier_id = item.get('supplier_id')
+                quantity = item.get('quantity', 1)
+                specification = item.get('specification', [])
 
-            try:
-                product = Product.objects.get(id=product_id)
-            except Product.DoesNotExist:
-                return Response({"error": f"Product with ID {product_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
+                try:
+                    product = Product.objects.get(name=name)
+                except Product.DoesNotExist:
+                    return Response({"error": f"Product with name {name} does not exist."}, status=status.HTTP_404_NOT_FOUND)
 
-            try:
-                supplier = Supplier.objects.get(id=supplier_id)
-            except Supplier.DoesNotExist:
-                return Response({"error": f"Supplier with ID {supplier_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
+                try:
+                    supplier = Supplier.objects.get(id=supplier_id)
+                except Supplier.DoesNotExist:
+                    return Response({"error": f"Supplier with ID {supplier_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
 
-            # Создаем запись в OrderProduct
-            OrderProduct.objects.create(order=order, product=product, supplier=supplier, quantity=quantity)
+                # Добавление товара в заказ
+                OrderProduct.objects.create(
+                    order=order, product=product, supplier=supplier, quantity=quantity,
+                    color=product.color, specification=specification, shipping_address=shipping_address
+                )
 
-        serializer = self.get_serializer(order)
+            created_orders.append(order)
+
+        # Отправляем результат
+        serializer = self.get_serializer(created_orders, many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
 
-    @action(detail=False, methods=['get'], parser_classes=[JSONParser])
-    def import_user_orders(self, request, *args, **kwargs):
-        """
-        Возвращает список товаров, которые заказал указанный пользователь.
-        """
-        # Извлекаем имя пользователя из запроса
-        username = request.data.get("username")
-        if not username:
-            return Response({"error": "Отсутствует имя пользователя."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Проверяем существование пользователя
-        user = get_object_or_404(User, username=username)
-
-        # Получаем все заказы пользователя
-        orders = Order.objects.filter(customer=user)
-
-        # Если заказы отсутствуют
-        if not orders.exists():
-            return Response({"message": f"У пользователя '{username}' нет заказов."}, status=status.HTTP_200_OK)
-
-        # Сбор информации о товарах
-        products = []
-        for order in orders:
-            order_products = OrderProduct.objects.filter(order=order).select_related('product', 'supplier')
-            for op in order_products:
-                products.append({
-                    "order": order.id,
-                    "pname": op.product.name,
-                    "name": op.supplier.name,
-                    "quantity": op.quantity,
-                    "status": order.status,
-                    "created_at": order.created_at,
-                })
-
-        return Response({"products": products}, status=status.HTTP_200_OK)
 

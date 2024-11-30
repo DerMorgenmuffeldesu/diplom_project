@@ -1,5 +1,5 @@
 from django.urls import path, include
-from .views import ProductViewSet, SupplierViewSet
+from .views import ProductViewSet, SupplierViewSet, ProductDetailView
 from rest_framework.routers import DefaultRouter
 
 
@@ -10,4 +10,5 @@ router.register(r'suppliers', SupplierViewSet)  # Это будет доступ
 
 urlpatterns = [
     path('', include(router.urls)),  # Это подключает все URL из DefaultRouter
+    path('product/<int:id>/', ProductDetailView.as_view(), name='product_detail')
 ]
