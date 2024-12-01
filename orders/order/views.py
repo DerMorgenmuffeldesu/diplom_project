@@ -112,3 +112,54 @@ class OrderViewSet(viewsets.ModelViewSet):
                 })
 
         return Response({"products": products}, status=status.HTTP_200_OK)
+
+
+    @action(detail=True, methods=['delete'], url_path='remove-product', url_name='remove_product')
+    def remove_product(self, request, pk=None):
+
+        """
+        Удаляет товар из заказа (корзины) по ID заказа и ID товара.
+        """
+
+        try:
+            order = self.get_object()  # Получаем текущий заказ
+            product_id = request.data.get('product_id')  # Получаем ID товара из тела запроса
+
+            if not product_id:
+                return Response({"error": "Product ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Находим товар в заказе
+            order_product = order.orderproduct_set.filter(product_id=product_id).first()
+
+            if not order_product:
+                return Response({"error": "Product not found in this order."}, status=status.HTTP_404_NOT_FOUND)
+
+            # Удаляем товар
+            order_product.delete()
+            return Response({"message": "Product removed from order."}, status=status.HTTP_204_NO_CONTENT)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+
+    @action(detail=True, methods=['delete'], url_path='remove-shipping-address', url_name='remove_shipping_address')
+    def delete_shipping_address(self, request, pk=None):
+
+        """
+        Удаляет адрес доставки для указанного заказа.
+        
+        """
+        try:
+            order = self.get_object()  # Получаем заказ по ID
+            if not order.shipping_address:
+                return Response({"error": "This order has no shipping address."}, status=status.HTTP_404_NOT_FOUND)
+
+            # Удаляем адрес доставки
+            order.shipping_address.delete()
+            order.shipping_address = None
+            order.save()
+
+            return Response({"message": "Shipping address removed successfully."}, status=status.HTTP_204_NO_CONTENT)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
