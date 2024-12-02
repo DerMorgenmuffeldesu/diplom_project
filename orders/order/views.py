@@ -12,6 +12,9 @@ from rest_framework.parsers import JSONParser
 from django.contrib.auth.models import User
 from users.serializers import ShippingAddressSerializer
 from users.models import ShippingAddress
+from django.http import JsonResponse
+from .utils import send_order_confirmation_email, send_order_cancellation_email
+from django.db.models import Q
 
 
 
@@ -94,6 +97,43 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
 
+    def retrieve(self, request, pk=None):
+
+        """
+        Получение детальной информации о заказе по его ID.
+        """
+        
+        try:
+            order = self.get_object()  # Получает объект заказа по pk
+            order_data = {
+                "id": order.id,
+                "customer": {
+                    "id": order.customer.id,
+                    "name": f"{order.customer.first_name} {order.customer.last_name}",
+                    "email": order.customer.email,
+                },
+                "created_at": order.created_at,
+                "status": order.status,
+                "shipping_address": {
+                    "address_line1": order.shipping_address.address_line1 if order.shipping_address else None,
+                    "city": order.shipping_address.city if order.shipping_address else None,
+                },
+                "items": [
+                    {
+                        "product_id": item.product.id,
+                        "name": item.product.name,
+                        "quantity": item.quantity,
+                        "price": item.product.price,  # Предполагается, что у продукта есть цена
+                        "supplier": item.supplier.supplier_name,
+                    }
+                    for item in order.orderproduct_set.all()
+                ],
+            }
+
+            return Response(order_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
+
 
     @action(detail=False, methods=['get'], url_path='import-products', url_name='import_products')
     def import_products(self, request, *args, **kwargs):
@@ -163,3 +203,102 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    
+    @action(detail=True, methods=['post'], url_path='confirm', url_name='confirm_order')
+    def confirm_order(self, request, pk=None):
+
+        """
+        Подтверждение заказа.
+        """
+
+        try:
+            # Получаем заказ по ID
+            order = self.get_object()
+
+            # Проверяем текущий статус заказа
+            if order.status == 'confirmed':
+                return Response({"error": "Order is already confirmed."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Изменяем статус заказа
+            order.status = 'confirmed'
+            order.save()
+
+            # Опционально: уведомление пользователя
+            # notify_user(order.customer, "Your order has been confirmed!")
+
+            return Response({"message": "Order confirmed successfully."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    
+    @action(detail=True, methods=['post'], url_path='confirm', url_name='confirm')
+    def confirm_order(self, request, pk=None):
+        """
+        Подтверждает заказ и отправляет email.
+        """
+        try:
+            order = self.get_object()
+            order.status = 'confirmed'
+            order.save()
+
+            # Отправляем email
+            send_order_confirmation_email(order)
+
+            return JsonResponse({"message": f"Order #{order.id} confirmed and email sent."}, status=200)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=400)
+        
+    
+    # Действие для отмены подтверждения
+    @action(detail=True, methods=['post'], url_path='cancel-confirmation', url_name='cancel_confirmation')
+    def cancel_confirmation(self, request, pk=None):
+        try:
+            order = self.get_object()  # Получаем заказ по pk
+            if order.status != 'confirmed':
+                return Response({"error": "Only confirmed orders can be canceled."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Отменяем подтверждение
+            order.status = 'pending'
+            order.save()
+
+            # Отправка email
+            send_order_cancellation_email(order)
+
+
+            return Response({"message": "Order confirmation canceled successfully."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+    
+    @action(detail=False, methods=['get'], url_path='filter-by-date', url_name='filter_by_date')
+    def filter_by_date(self, request):
+
+        """
+        Получить заказы по указанной дате (или диапазону дат).
+        Пример URL: /api/order/filter-by-date/?start_date=2024-12-01&end_date=2024-12-02
+        """
+
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+
+        if not start_date and not end_date:
+            return Response({"error": "Please provide at least start_date or end_date."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            filters = Q()
+            if start_date:
+                filters &= Q(created_at__date__gte=start_date)  # Дата начала
+            if end_date:
+                filters &= Q(created_at__date__lte=end_date)  # Дата окончания
+
+            orders = self.queryset.filter(filters)
+            serializer = self.get_serializer(orders, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    

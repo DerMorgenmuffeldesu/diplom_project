@@ -104,7 +104,7 @@ REST_FRAMEWORK = {
 
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-
+DEFAULT_FROM_EMAIL = 'no-reply@example.com'
 
 
 SIMPLE_JWT = {

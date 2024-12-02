@@ -6,6 +6,13 @@ from users.models import ShippingAddress
 
 
 class Order(models.Model):
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('canceled', 'Canceled'),
+    ]
+    
     customer = models.ForeignKey(User, on_delete=models.CASCADE)
     products = models.ManyToManyField(Product, through='OrderProduct')
     created_at = models.DateTimeField(auto_now_add=True)
