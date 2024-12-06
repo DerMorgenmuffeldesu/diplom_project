@@ -10,7 +10,6 @@ from rest_framework.exceptions import ValidationError
 
 
 
-
 class SupplierViewSet(viewsets.ModelViewSet):
     queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer

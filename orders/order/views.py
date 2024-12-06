@@ -15,6 +15,7 @@ from users.models import ShippingAddress
 from django.http import JsonResponse
 from .utils import send_order_confirmation_email, send_order_cancellation_email
 from django.db.models import Q
+from .tasks import update_order_total
 
 
 
@@ -301,4 +302,22 @@ class OrderViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    
+
+
+class OrderProductViewSet(viewsets.ModelViewSet):
+    queryset = OrderProduct.objects.all()
+
+    def perform_create(self, serializer):
+        """
+        При создании объекта OrderProduct обновляем сумму заказа.
+        """
+        order_product = serializer.save()
+        update_order_total.delay(order_product.order.id)  # Асинхронно обновляем сумму заказа
+
+    def perform_destroy(self, instance):
+        """
+        При удалении объекта OrderProduct обновляем сумму заказа.
+        """
+        order_id = instance.order.id
+        instance.delete()
+        update_order_total.delay(order_id)  # Асинхронно обновляем сумму заказа
