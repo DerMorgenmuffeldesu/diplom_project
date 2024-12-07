@@ -4,6 +4,9 @@ from .tasks import process_avatar
 from django.core.exceptions import ValidationError
 import logging
 
+
+
+
 logger = logging.getLogger(__name__)
 
 class Profile(models.Model):

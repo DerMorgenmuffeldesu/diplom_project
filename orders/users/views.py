@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from rest_framework import status, permissions, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -17,6 +17,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.core.exceptions import ValidationError
 from .models import ShippingAddress
 from rest_framework import viewsets
+import requests
 
 
 
@@ -60,6 +61,54 @@ class LoginView(APIView):
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+
+class YandexOAuthRedirectView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        yandex_oauth_url = (
+            "https://oauth.yandex.ru/authorize?"
+            "response_type=code&"  # Меняем на получение code
+            "client_id=your client id"
+        )
+        return redirect(yandex_oauth_url)
+
+
+
+class YandexOAuthCallbackView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        code = request.GET.get('code')  # Получаем code из URL
+        if not code:
+            return Response({'error': 'Authorization code is missing'}, status=400)
+
+        # Обмениваем code на access_token
+        response = requests.post(
+            'https://oauth.yandex.ru/token',
+            data={
+                'grant_type': 'authorization_code',
+                'code': code,
+                'client_id': 'your client id',
+                'client_secret': 'your client secret',  
+            }
+        )
+
+        token_data = response.json()
+        if 'access_token' not in token_data:
+            return Response({'error': 'Failed to obtain access token'}, status=400)
+
+        # Делаем запрос к Yandex API с токеном
+        user_response = requests.get(
+            'https://login.yandex.ru/info',
+            headers={'Authorization': f'OAuth {token_data["access_token"]}'}
+        )
+        user_info = user_response.json()
+
+        if 'login' not in user_info:
+            return Response({'error': 'Failed to verify token'}, status=400)
+
+        return Response({'user_info': user_info})
 
 
 class ProtectedView(APIView):

@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'users',
     'django_extensions',
     'drf_spectacular',
+    'social_django',
 ]
 
 MIDDLEWARE = [
@@ -59,6 +60,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'social_django.middleware.SocialAuthExceptionMiddleware',
 ]
 
 ROOT_URLCONF = 'orders.urls'
@@ -109,6 +111,11 @@ REST_FRAMEWORK = {
 }
 
 
+AUTHENTICATION_BACKENDS = [
+    'social_core.backends.yandex.YandexOAuth2',
+    'django.contrib.auth.backends.ModelBackend',  # стандартный бэкенд
+]
+
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'no-reply@example.com'
@@ -130,6 +137,13 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 
+SOCIAL_AUTH_YANDEX_OAUTH2_KEY =  'your client_id'
+SOCIAL_AUTH_YANDEX_OAUTH2_SECRET = 'your secret'
+
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
+
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -149,6 +163,35 @@ LOGGING = {
         },
     },
 }
+
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'orders',
+    'DESCRIPTION': 'API для авторизации через Яндекс',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
+    'SECURITY': [
+        {
+            'BearerAuth': [],
+        },
+    ],
+    'COMPONENTS': {
+        'securitySchemes': {
+            'BearerAuth': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+            },
+        },
+    },
+}
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
 
 
 # Password validation
