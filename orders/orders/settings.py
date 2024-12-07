@@ -14,6 +14,7 @@ from pathlib import Path
 from datetime import timedelta
 from django.core.mail import send_mail
 from django.conf import settings
+import sqlite3
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -47,6 +48,7 @@ INSTALLED_APPS = [
     'order',
     'users',
     'django_extensions',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -87,6 +89,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        'OPTIONS': {
+            'timeout': 30,  # Увеличьте значение по умолчанию (5 секунд)
+        },
     }
 }
 
@@ -100,7 +105,9 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
         'rest_framework.permissions.AllowAny',
     ),
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
+
 
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
@@ -118,6 +125,30 @@ CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        '': {  # Логи из приложения
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+    },
+}
 
 
 # Password validation

@@ -8,7 +8,7 @@ class SpecificationInline(admin.TabularInline):
     extra = 1  # Количество пустых строк для добавления новых спецификаций
 
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'supplier', 'price', 'stock', 'color')
+    list_display = ('name', 'supplier', 'price', 'stock', 'color', 'image')
     inlines = [SpecificationInline]
 
 

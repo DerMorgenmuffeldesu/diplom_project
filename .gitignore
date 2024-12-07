@@ -27,3 +27,4 @@ migrations/
 .coverage
 
 api_tests/
+media/

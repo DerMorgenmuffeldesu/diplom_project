@@ -16,6 +16,16 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = User.objects.create_user(**validated_data)
         return user
+    
+    def validate_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters long.")
+        return value
+    
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("This email is already registered.")
+        return value
 
     
 
@@ -30,6 +40,23 @@ class LoginSerializer(serializers.Serializer):
         data['user'] = user
         return data
     
+
+class PasswordResetSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)
+    
+    def validate_new_password(self, value):
+        # Проверка пароля на минимальную длину
+        if len(value) < 8:
+            raise serializers.ValidationError("New password must be at least 8 characters long.")
+        return value
+
+
+class SomeSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    username = serializers.CharField()
+    email = serializers.EmailField()
+
 
 class ShippingAddressSerializer(serializers.ModelSerializer):
     class Meta:

@@ -15,6 +15,7 @@ class Supplier(models.Model):
 
 
 class Product(models.Model):
+    image = models.ImageField(upload_to='products/', null=True, blank=True)
     name = models.CharField(max_length=255)
     supplier = models.ForeignKey(Supplier, on_delete=models.CASCADE, related_name="products")
     description = models.CharField(max_length=255, null=True, blank=True)

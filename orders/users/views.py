@@ -2,7 +2,8 @@ from django.shortcuts import render
 from rest_framework import status, permissions, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .serializers import RegisterSerializer, LoginSerializer, ShippingAddressSerializer
+from yaml import serialize
+from .serializers import RegisterSerializer, LoginSerializer, ShippingAddressSerializer, SomeSerializer, PasswordResetSerializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -20,22 +21,32 @@ from rest_framework import viewsets
 
 
 class RegisterView(APIView):
+    """
+        Регистрация пользователя
+
+    """
     permission_classes = [AllowAny]  # Разрешаем доступ без аутентификации
+    queryset = User.objects.all()
+    serializer_class = RegisterSerializer 
     authentication_classes = [] 
 
-    def get(self, request):
-        return Response({"message": "Register endpoint is active"}, status=200)
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            serializer.save()  # Сохраняем пользователя
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    
 
 class LoginView(APIView):
+    """
+        Авторизация пользователя
+
+    """
     permission_classes = [permissions.AllowAny]
+    serializer_class = LoginSerializer
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -52,43 +63,41 @@ class LoginView(APIView):
 
 
 class ProtectedView(APIView):
+    serializer_class = SomeSerializer 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response({"message": "You have access to this resource."})
+        # Отправляем данные о пользователе
+        serializer = self.get_serializer({
+            'user_id': request.user.id,
+            'username': request.user.username,
+            'email': request.user.email
+        })
+        return Response(serializer.data)
     
 
 
 class PasswordResetView(APIView):
     permission_classes = [IsAuthenticated]  # Доступно только аутентифицированным пользователям
+    serializer_class = PasswordResetSerializer
 
     def post(self, request):
-        old_password = request.data.get('old_password')
-        new_password = request.data.get('new_password')
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            old_password = serializer.validated_data['old_password']
+            new_password = serializer.validated_data['new_password']
+            user = request.user
 
-        # Проверяем, что оба пароля предоставлены
-        if not old_password or not new_password:
-            return Response({'detail': 'Both old and new passwords are required.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            # Проверяем старый пароль
+            if not user.check_password(old_password):
+                return Response({'detail': 'Old password is incorrect.'}, status=400)
 
-        user = request.user
+            # Устанавливаем новый пароль
+            user.set_password(new_password)
+            user.save()
 
-        # Проверяем правильность старого пароля
-        if not user.check_password(old_password):
-            return Response({'detail': 'Old password is incorrect.'},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        # Проверка нового пароля (стандартные проверки Django)
-        try:
-            validate_password(new_password, user)
-        except ValidationError as e:
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Устанавливаем новый пароль
-        user.set_password(new_password)
-        user.save()
-
-        return Response({'detail': 'Password has been successfully updated.'}, status=status.HTTP_200_OK)
+            return Response({'detail': 'Password has been successfully updated.'}, status=200)
+        return Response(serializer.errors, status=400)
 
 
 
