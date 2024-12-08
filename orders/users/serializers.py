@@ -52,11 +52,6 @@ class PasswordResetSerializer(serializers.Serializer):
         return value
 
 
-class SomeSerializer(serializers.Serializer):
-    user_id = serializers.IntegerField()
-    username = serializers.CharField()
-    email = serializers.EmailField()
-
 
 class ShippingAddressSerializer(serializers.ModelSerializer):
     class Meta:

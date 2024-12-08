@@ -3,7 +3,7 @@ from rest_framework import status, permissions, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from yaml import serialize
-from .serializers import RegisterSerializer, LoginSerializer, ShippingAddressSerializer, SomeSerializer, PasswordResetSerializer
+from .serializers import RegisterSerializer, LoginSerializer, ShippingAddressSerializer, PasswordResetSerializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -18,6 +18,8 @@ from django.core.exceptions import ValidationError
 from .models import ShippingAddress
 from rest_framework import viewsets
 import requests
+from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
+from drf_spectacular.utils import extend_schema
 
 
 
@@ -28,6 +30,7 @@ class RegisterView(APIView):
     """
     permission_classes = [AllowAny]  # Разрешаем доступ без аутентификации
     queryset = User.objects.all()
+    throttle_classes = [AnonRateThrottle]  # Для анонимных пользователей
     serializer_class = RegisterSerializer 
     authentication_classes = [] 
 
@@ -47,6 +50,7 @@ class LoginView(APIView):
 
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AnonRateThrottle]  # Троттлинг для авторизации
     serializer_class = LoginSerializer
 
     def post(self, request):
@@ -111,18 +115,18 @@ class YandexOAuthCallbackView(APIView):
         return Response({'user_info': user_info})
 
 
-class ProtectedView(APIView):
-    serializer_class = SomeSerializer 
+class ProtectedView(APIView): 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Protected endpoint",
+        description="This endpoint requires Bearer authentication to access.",
+        responses={200: {"type": "object", "properties": {"message": {"type": "string"}}}},
+        auth=["BearerAuth"]  # Указываем схему безопасности
+    )
     def get(self, request):
-        # Отправляем данные о пользователе
-        serializer = self.get_serializer({
-            'user_id': request.user.id,
-            'username': request.user.username,
-            'email': request.user.email
-        })
-        return Response(serializer.data)
+        data = {"message": "This is a protected view!"}
+        return Response(data, status=status.HTTP_200_OK)
     
 
 

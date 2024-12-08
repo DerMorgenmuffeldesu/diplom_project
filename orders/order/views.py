@@ -9,6 +9,7 @@ from products.models import Product, Supplier, Specification
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
 from rest_framework.parsers import JSONParser
+from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 from django.contrib.auth.models import User
 from users.serializers import ShippingAddressSerializer
 from users.models import ShippingAddress
@@ -33,6 +34,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle]  # Применяем троттлинг для всего ViewSet
 
     def create(self, request, *args, **kwargs):
         user = request.user

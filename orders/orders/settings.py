@@ -15,6 +15,10 @@ from datetime import timedelta
 from django.core.mail import send_mail
 from django.conf import settings
 import sqlite3
+import rollbar
+from rollbar.contrib.django.middleware import RollbarNotifierMiddleware
+
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -50,6 +54,7 @@ INSTALLED_APPS = [
     'django_extensions',
     'drf_spectacular',
     'social_django',
+    'errors',
 ]
 
 MIDDLEWARE = [
@@ -61,6 +66,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'social_django.middleware.SocialAuthExceptionMiddleware',
+    'rollbar.contrib.django.middleware.RollbarNotifierMiddleware',
 ]
 
 ROOT_URLCONF = 'orders.urls'
@@ -108,6 +114,14 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+     'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '2/min',  # 2 запросa в минуту для неавторизованных пользователей
+        'user': '2/min',  # 2 запросa в минуту для авторизованных пользователей
+    },
 }
 
 
@@ -167,16 +181,10 @@ LOGGING = {
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'orders',
-    'DESCRIPTION': 'API для авторизации через Яндекс',
+    'DESCRIPTION': '......',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
-    'COMPONENT_SPLIT_REQUEST': True,
-    'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
-    'SECURITY': [
-        {
-            'BearerAuth': [],
-        },
-    ],
+    'SECURITY': [{'BearerAuth': []}],  # Схема безопасности
     'COMPONENTS': {
         'securitySchemes': {
             'BearerAuth': {
@@ -188,10 +196,21 @@ SPECTACULAR_SETTINGS = {
     },
 }
 
+
+
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
 ]
+
+
+ROLLBAR = {
+    'access_token': 'a7094080e0ce4e05a9d963a6c9de19bf',
+    'environment': 'development' if DEBUG else 'production',
+    'code_version': '1.0',
+    'root': BASE_DIR,
+}
+rollbar.init(**ROLLBAR)
 
 
 # Password validation
