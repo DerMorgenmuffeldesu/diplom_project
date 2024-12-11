@@ -55,6 +55,8 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'social_django',
     'errors',
+    'cacheops',
+    'grappelli',
 ]
 
 MIDDLEWARE = [
@@ -211,6 +213,21 @@ ROLLBAR = {
     'root': BASE_DIR,
 }
 rollbar.init(**ROLLBAR)
+
+
+CACHEOPS_REDIS = {
+    'host': 'localhost',  # Адрес Redis
+    'port': 6379,         # Порт Redis
+    'db': 1,              # Номер базы данных Redis
+}
+
+CACHEOPS = {
+    'app_name.model_name': {'ops': 'all', 'timeout': 60*15},  # Кэширование всех операций на 15 минут
+    'auth.user': {'ops': 'get', 'timeout': 60*15},
+    'auth.*': {'ops': ('fetch', 'get'), 'timeout': 60*60},
+    '*.*': {'timeout': 60*15},  
+}
+
 
 
 # Password validation

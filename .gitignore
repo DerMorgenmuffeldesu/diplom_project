@@ -28,3 +28,4 @@ migrations/
 
 api_tests/
 media/
+htmlcov/
